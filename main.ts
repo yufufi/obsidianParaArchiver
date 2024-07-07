@@ -1,4 +1,5 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { path } from 'path';
 
 // Remember to rename these classes and interfaces!
 
@@ -17,16 +18,50 @@ export default class MyPlugin extends Plugin {
 		await this.loadSettings();
 
 		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
+		const ribbonIconEl = this.addRibbonIcon('archive', 'Archive', async (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
 			new Notice('This is a notice!');
+
+            const currentFile = app.workspace.getActiveFile();
+            if (!currentFile) {
+                new Notice('No file is selected!');
+                return;
+            }
+            const oldPath = currentFile.path;
+            const newPath = `/40.Archive/${oldPath}`;
+            const newFolder = newPath.split("/").slice(0,-1).join("/");  //split to array & remove last element
+            if (app.vault.getFolderByPath(newFolder) == null) {
+                await app.vault.createFolder(newFolder);
+            }
+
+            try {
+                app.vault.rename(currentFile, newPath).then(() => 
+                {
+                    const frontmatter = app.metadataCache.getFileCache(currentFile)?.frontmatter || {};
+                    const tags = new Set(frontmatter.tags || []);
+                    tags.add('archive');
+
+                    app.fileManager.processFrontMatter(currentFile, (frontmatter) => 
+                    {
+                       frontmatter["tags"]=tags;
+                    })
+
+                    app.workspace.trigger('file-change', currentFile);
+                    if (app.workspace.activeLeaf != null) {
+                        app.workspace.activeLeaf.openFile(currentFile);
+                    }
+                })
+                                                            
+            } catch (error) {
+                console.error('Error archiving file:', error);
+            }
 		});
 		// Perform additional things with the ribbon
 		ribbonIconEl.addClass('my-plugin-ribbon-class');
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
+		// const statusBarItemEl = this.addStatusBarItem();
+		// statusBarItemEl.setText('Status Bar Text');
 
 		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
